@@ -36,10 +36,10 @@ build/
 *.egg-info/
 
 # Project-specific
-shorts_factory/output/
-shorts_factory/output/*.mp4
-shorts_factory/output/*.gif
-shorts_factory/output/*.webm
+/output/
+/output/*.mp4
+/output/*.gif
+/output/*.webm
 
 # Cursor / MCP
 .cursor/
