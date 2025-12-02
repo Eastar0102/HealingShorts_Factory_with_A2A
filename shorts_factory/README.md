@@ -122,7 +122,6 @@ YOUTUBE_CLIENT_SECRETS_FILE=path/to/client_secrets.json
 ### 서버 실행
 
 ```bash
-cd shorts_factory
 python -m server.main
 ```
 
@@ -135,7 +134,6 @@ uvicorn server.main:app --host 0.0.0.0 --port 8000
 ### MCP 클라이언트 실행
 
 ```bash
-cd shorts_factory
 python -m client.mcp_bridge
 ```
 
@@ -183,49 +181,49 @@ Healing Shorts를 생성합니다.
 
 ## 디렉토리 구조
 
-프로젝트 루트(`C:\Projects\shortsFactory`) 기준:
+프로젝트 루트 기준:
 
 ```
 .
 ├── .gitignore
-├── shorts_factory/
-│   ├── README.md
-│   ├── requirements.txt
-│   ├── OAUTH_SETUP.md
-│   ├── output/                      # 생성된 비디오 (gitignore 대상)
-│   ├── client/
-│   │   └── mcp_bridge.py            # FastMCP 클라이언트
-│   ├── scripts/
-│   │   ├── start_agent.sh
-│   │   ├── start_agent.bat
-│   │   └── start_all_agents.py      # 모든 에이전트 서버 일괄 실행 스크립트
-│   ├── server/
-│   │   ├── main.py                  # FastAPI 메인 서버 (UI + REST + MCP 엔트리포인트)
-│   │   ├── models.py                # Pydantic 모델
-│   │   ├── orchestrator.py          # A2A 워크플로우 오케스트레이터
-│   │   ├── tools.py                 # 비디오 처리 및 YouTube 업로드 도구
-│   │   ├── a2a_client.py            # A2A 클라이언트
-│   │   ├── a2a_server.py            # A2A 서버 베이스
-│   │   ├── a2a_config.py            # 에이전트 서버 설정
-│   │   └── agents/
-│   │       ├── base.py              # 베이스 에이전트 (Gemini 연동)
-│   │       ├── planner.py           # Planner 에이전트
-│   │       ├── reviewer.py          # Reviewer 에이전트
-│   │       ├── uploader.py          # Uploader 에이전트
-│   │       ├── producer_server.py   # Producer 에이전트 서버
-│   │       ├── planner_server.py    # Planner 에이전트 서버
-│   │       ├── reviewer_server.py   # Reviewer 에이전트 서버
-│   │       └── uploader_server.py   # Uploader 에이전트 서버
-│   └── static/                      # 웹 UI 정적 파일
+├── README.md
+├── requirements.txt
+├── OAUTH_SETUP.md
+├── output/                          # 생성된 비디오 (gitignore 대상)
+├── client/
+│   └── mcp_bridge.py                # FastMCP 클라이언트
+├── scripts/
+│   ├── start_agent.sh
+│   ├── start_agent.bat
+│   └── start_all_agents.py          # 모든 에이전트 서버 일괄 실행 스크립트
+├── server/
+│   ├── main.py                      # FastAPI 메인 서버 (UI + REST + MCP 엔트리포인트)
+│   ├── models.py                    # Pydantic 모델
+│   ├── orchestrator.py              # A2A 워크플로우 오케스트레이터
+│   ├── tools.py                     # 비디오 처리 및 YouTube 업로드 도구
+│   ├── a2a_client.py                # A2A 클라이언트
+│   ├── a2a_server.py                # A2A 서버 베이스
+│   ├── a2a_config.py                # 에이전트 서버 설정
+│   └── agents/
+│       ├── base.py                  # 베이스 에이전트 (Gemini 연동)
+│       ├── planner.py               # Planner 에이전트
+│       ├── reviewer.py              # Reviewer 에이전트
+│       ├── uploader.py              # Uploader 에이전트
+│       ├── producer_server.py       # Producer 에이전트 서버
+│       ├── planner_server.py        # Planner 에이전트 서버
+│       ├── reviewer_server.py       # Reviewer 에이전트 서버
+│       └── uploader_server.py        # Uploader 에이전트 서버
+├── static/                          # 웹 UI 정적 파일
 └── venv/                            # (선택) 가상환경, gitignore 대상
 ```
 
 ## 빠른 시작
 
-### 1. 저장소 클론 및 이동
+### 1. 저장소 클론
 
 ```bash
-cd shorts_factory
+git clone https://github.com/Eastar0102/HealingShorts_Factory_with_A2A.git
+cd HealingShorts_Factory_with_A2A
 ```
 
 ### 2. 가상 환경 생성 (선택사항)
