@@ -16,11 +16,11 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException, WebSocket, WebSocke
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
 
 from .orchestrator import Orchestrator
-from .tools import generate_veo_video_for_duration, make_seamless_loop
+from .tools import generate_veo_video_for_duration
 from .models import WorkflowResponse
 from .agents.uploader import UploaderAgent
 from .a2a_config import A2AConfig
@@ -83,11 +83,25 @@ class ConnectionManager:
         await websocket.send_json(message)
     
     async def broadcast(self, message: dict):
+        disconnected = []
         for connection in self.active_connections:
             try:
                 await connection.send_json(message)
-            except:
-                pass
+            except (WebSocketDisconnect, ConnectionError, OSError) as e:
+                # 끊어진 연결은 제거 목록에 추가
+                disconnected.append(connection)
+                print(f"[WebSocket] 연결 끊김 감지 및 제거: {type(e).__name__}")
+            except Exception as e:
+                # 기타 예외는 로그만 남기고 계속 진행
+                print(f"[WebSocket] 브로드캐스트 오류: {type(e).__name__}: {str(e)}")
+                disconnected.append(connection)
+        
+        # 끊어진 연결 제거
+        for conn in disconnected:
+            try:
+                self.active_connections.remove(conn)
+            except ValueError:
+                pass  # 이미 제거된 경우 무시
 
 manager = ConnectionManager()
 
@@ -245,12 +259,15 @@ async def process_video_pipeline_with_updates(
     """
     try:
         # Veo 비디오 생성 시작
-        await manager.broadcast({
-            "type": "video_status",
-            "status": "generating",
-            "message": "Veo 비디오 생성 중...",
-            "step": "veo_generation"
-        })
+        try:
+            await manager.broadcast({
+                "type": "video_status",
+                "status": "generating",
+                "message": "Veo 비디오 생성 중...",
+                "step": "veo_generation"
+            })
+        except Exception as e:
+            print(f"[WARNING] WebSocket 브로드캐스트 실패 (무시하고 계속): {str(e)}")
         
         veo_video_path = generate_veo_video_for_duration(
             prompt=approved_prompt,
@@ -259,60 +276,80 @@ async def process_video_pipeline_with_updates(
             resolution="1080p",  # YouTube Shorts 권장 해상도
         )
         
-        await manager.broadcast({
-            "type": "video_status",
-            "status": "veo_complete",
-            "message": f"Veo 비디오 생성 완료: {veo_video_path}",
-            "step": "veo_generation",
-            "video_path": veo_video_path
-        })
+        try:
+            await manager.broadcast({
+                "type": "video_status",
+                "status": "veo_complete",
+                "message": f"Veo 비디오 생성 완료: {veo_video_path}",
+                "step": "veo_generation",
+                "video_path": veo_video_path
+            })
+        except Exception as e:
+            print(f"[WARNING] WebSocket 브로드캐스트 실패 (무시하고 계속): {str(e)}")
         
-        # Seamless loop 생성 시작
-        await manager.broadcast({
-            "type": "video_status",
-            "status": "looping",
-            "message": "Seamless loop 생성 중...",
-            "step": "loop_creation"
-        })
+        # Seamless loop 제거 - 원본 비디오 그대로 사용
+        final_video_path = veo_video_path
         
-        looped_video_path = make_seamless_loop(
-            veo_video_path,
-            target_duration=video_duration,
-            target_resolution=(1080, 1920)  # YouTube Shorts 규격
-        )
-        
-        await manager.broadcast({
-            "type": "video_status",
-            "status": "loop_complete",
-            "message": f"Seamless loop 생성 완료: {looped_video_path}",
-            "step": "loop_creation",
-            "video_path": looped_video_path
-        })
-        
-        # YouTube 업로드는 비디오 완료 후 버튼으로 진행하므로 여기서는 제거
-        # 완료
         # 웹에서 접근 가능하도록 파일명만 추출
         import os
-        video_filename = os.path.basename(looped_video_path)
+        video_filename = os.path.basename(final_video_path)
         
-        await manager.broadcast({
-            "type": "video_status",
-            "status": "completed",
-            "message": "비디오 파이프라인 완료",
-            "step": "complete",
-            "final_video_path": looped_video_path,
-            "video_filename": video_filename,  # 웹 접근용 파일명
-            "video_ready_for_upload": True,  # 업로드 준비 완료 플래그
-            "youtube_metadata": youtube_metadata  # Gemini가 생성한 YouTube 메타데이터
-        })
+        # YouTube 업로드가 요청된 경우 자동으로 업로드 진행
+        youtube_url = None
+        if upload_to_youtube:
+            try:
+                youtube_url = await process_youtube_upload_with_updates(
+                    video_path=final_video_path,
+                    title=youtube_title,
+                    description=youtube_description,
+                    tags=youtube_tags,
+                    privacy_status="public",
+                    youtube_metadata=youtube_metadata
+                )
+            except Exception as upload_error:
+                try:
+                    await manager.broadcast({
+                        "type": "video_status",
+                        "status": "upload_failed",
+                        "message": f"YouTube 업로드 실패: {str(upload_error)}",
+                        "step": "youtube_upload"
+                    })
+                except Exception as e:
+                    print(f"[WARNING] WebSocket 브로드캐스트 실패 (무시하고 계속): {str(e)}")
+                # 업로드 실패해도 비디오는 완료된 것으로 표시
+                youtube_url = None
+        
+        try:
+            await manager.broadcast({
+                "type": "video_status",
+                "status": "completed",
+                "message": "비디오 파이프라인 완료" + (f" (YouTube 업로드 완료: {youtube_url})" if youtube_url else ""),
+                "step": "complete",
+                "final_video_path": final_video_path,
+                "video_filename": video_filename,  # 웹 접근용 파일명
+                "video_ready_for_upload": not upload_to_youtube,  # 자동 업로드 안 했으면 버튼 표시
+                "youtube_url": youtube_url,  # 업로드된 YouTube URL
+                "youtube_metadata": youtube_metadata  # Gemini가 생성한 YouTube 메타데이터
+            })
+        except Exception as e:
+            print(f"[WARNING] WebSocket 브로드캐스트 실패 (무시하고 계속): {str(e)}")
         
     except Exception as e:
-        await manager.broadcast({
-            "type": "video_status",
-            "status": "error",
-            "message": f"비디오 파이프라인 오류: {str(e)}",
-            "step": "error"
-        })
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"[ERROR] 비디오 파이프라인 오류: {str(e)}")
+        print(f"[ERROR] 상세 에러:\n{error_trace}")
+        
+        # WebSocket 브로드캐스트 시도 (실패해도 무시)
+        try:
+            await manager.broadcast({
+                "type": "video_status",
+                "status": "error",
+                "message": f"비디오 파이프라인 오류: {str(e)}",
+                "step": "error"
+            })
+        except Exception as broadcast_error:
+            print(f"[WARNING] WebSocket 브로드캐스트 실패: {str(broadcast_error)}")
 
 
 @app.get("/", response_class=FileResponse)
@@ -333,6 +370,67 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_json({"type": "echo", "message": data})
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+
+
+async def process_video_pipeline_sync(
+    approved_prompt: str,
+    video_duration: float = 30.0,
+    upload_to_youtube: bool = False,
+    youtube_title: Optional[str] = None,
+    youtube_description: Optional[str] = None,
+    youtube_tags: Optional[List[str]] = None,
+    youtube_metadata: Optional[Dict] = None
+) -> Dict[str, Any]:
+    """
+    비디오 생성 파이프라인을 동기적으로 실행하고 완료될 때까지 기다립니다.
+    MCP 브리지에서 사용하기 위한 동기 버전입니다.
+    """
+    try:
+        from .tools import generate_veo_video_for_duration
+        
+        # Veo 비디오 생성
+        veo_video_path = generate_veo_video_for_duration(
+            prompt=approved_prompt,
+            total_duration_seconds=int(video_duration) if video_duration else None,
+            aspect_ratio="9:16",
+            resolution="1080p",
+        )
+        
+        # Seamless loop 제거 - 원본 비디오 그대로 사용
+        final_video_path = veo_video_path
+        
+        import os
+        video_filename = os.path.basename(final_video_path)
+        
+        # YouTube 업로드가 요청된 경우 자동으로 업로드 진행
+        youtube_url = None
+        if upload_to_youtube:
+            try:
+                youtube_url = await process_youtube_upload_with_updates(
+                    video_path=final_video_path,
+                    title=youtube_title,
+                    description=youtube_description,
+                    tags=youtube_tags,
+                    privacy_status="public",
+                    youtube_metadata=youtube_metadata
+                )
+            except Exception as upload_error:
+                print(f"[ERROR] YouTube 업로드 실패: {str(upload_error)}")
+                youtube_url = None
+        
+        return {
+            "success": True,
+            "video_path": final_video_path,
+            "video_filename": video_filename,
+            "youtube_url": youtube_url
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "video_path": None,
+            "youtube_url": None
+        }
 
 
 @app.post("/v1/create_shorts", response_model=WorkflowResponse)
@@ -462,6 +560,107 @@ async def create_shorts(
         )
 
 
+@app.post("/v1/create_shorts_sync", response_model=WorkflowResponse)
+async def create_shorts_sync(
+    request: CreateShortsRequest
+):
+    """
+    Healing Shorts 생성 엔드포인트 (동기 버전)
+    
+    비디오 생성과 YouTube 업로드가 완료될 때까지 기다립니다.
+    MCP 브리지에서 사용하기 위한 엔드포인트입니다.
+    """
+    try:
+        # 0. 필요한 에이전트 서버들이 실행 중인지 확인
+        from .a2a_config import A2AConfig
+        
+        planner_healthy = check_agent_health(A2AConfig.get_planner_url(), timeout=1.0)
+        reviewer_healthy = check_agent_health(A2AConfig.get_reviewer_url(), timeout=1.0)
+        
+        if not planner_healthy or not reviewer_healthy:
+            print("[WARNING] 일부 에이전트 서버가 응답하지 않습니다. 재시도 중...")
+            agent_status = await ensure_agent_servers_running()
+            
+            if not agent_status.get("planner", False):
+                raise HTTPException(
+                    status_code=503,
+                    detail="PlannerAgent 서버를 시작할 수 없습니다. 서버를 재시작해주세요."
+                )
+            if not agent_status.get("reviewer", False):
+                raise HTTPException(
+                    status_code=503,
+                    detail="ReviewerAgent 서버를 시작할 수 없습니다. 서버를 재시작해주세요."
+                )
+        
+        # 1. A2A 워크플로우 실행
+        workflow_result = await orchestrator.run_a2a_workflow(
+            request.topic,
+            video_duration=request.video_duration
+        )
+        
+        if not workflow_result["success"]:
+            return WorkflowResponse(
+                status="failed",
+                conversation_log=workflow_result.get("conversation_log", []),
+                message=workflow_result.get("error", "워크플로우 실행 실패")
+            )
+        
+        approved_prompt = workflow_result["approved_prompt"]
+        conversation_log = workflow_result["conversation_log"]
+        youtube_metadata = workflow_result.get("youtube_metadata")
+        
+        # YouTube 메타데이터 설정
+        youtube_title = request.youtube_title
+        youtube_description = request.youtube_description
+        youtube_tags = request.youtube_tags
+        
+        if youtube_metadata:
+            if not youtube_title:
+                youtube_title = youtube_metadata.title
+            if not youtube_description:
+                youtube_description = youtube_metadata.description
+            if not youtube_tags:
+                youtube_tags = youtube_metadata.tags
+        
+        # 2. 비디오 생성 및 업로드 (동기적으로 완료될 때까지 기다림)
+        video_result = await process_video_pipeline_sync(
+            approved_prompt=approved_prompt,
+            video_duration=request.video_duration,
+            upload_to_youtube=request.upload_to_youtube,
+            youtube_title=youtube_title,
+            youtube_description=youtube_description,
+            youtube_tags=youtube_tags,
+            youtube_metadata=youtube_metadata.dict() if youtube_metadata else None
+        )
+        
+        if not video_result["success"]:
+            return WorkflowResponse(
+                status="failed",
+                approved_prompt=approved_prompt,
+                conversation_log=conversation_log,
+                youtube_metadata=youtube_metadata,
+                message=f"비디오 생성 실패: {video_result.get('error', 'Unknown error')}"
+            )
+        
+        # 3. 완료 응답 반환
+        return WorkflowResponse(
+            status="completed",
+            approved_prompt=approved_prompt,
+            conversation_log=conversation_log,
+            youtube_metadata=youtube_metadata,
+            video_path=video_result.get("video_path"),
+            youtube_url=video_result.get("youtube_url"),
+            message=f"비디오 생성 및 업로드 완료! (반복 횟수: {workflow_result['iterations']}, 점수: {workflow_result['final_score']})" + 
+                   (f" YouTube URL: {video_result.get('youtube_url')}" if video_result.get("youtube_url") else "")
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"서버 오류: {str(e)}"
+        )
+
+
 class UploadYouTubeRequest(BaseModel):
     """YouTube 업로드 요청 모델"""
     video_path: str = Field(description="업로드할 비디오 파일 경로")
@@ -483,12 +682,15 @@ async def process_youtube_upload_with_updates(
     UploaderAgent를 사용하여 YouTube 업로드를 실행하고 WebSocket으로 진행 상황을 전송합니다.
     """
     try:
-        await manager.broadcast({
-            "type": "youtube_upload_status",
-            "status": "uploading",
-            "message": "UploaderAgent: YouTube 업로드 준비 중...",
-            "step": "youtube_upload"
-        })
+        try:
+            await manager.broadcast({
+                "type": "youtube_upload_status",
+                "status": "uploading",
+                "message": "UploaderAgent: YouTube 업로드 준비 중...",
+                "step": "youtube_upload"
+            })
+        except Exception as e:
+            print(f"[WARNING] WebSocket 브로드캐스트 실패 (무시하고 계속): {str(e)}")
         
         # YouTubeMetadata 객체 생성 (있는 경우)
         from .models import YouTubeMetadata
@@ -510,24 +712,30 @@ async def process_youtube_upload_with_updates(
         )
         
         if result["success"]:
-            await manager.broadcast({
-                "type": "youtube_upload_status",
-                "status": "upload_complete",
-                "message": f"UploaderAgent: {result['message']}",
-                "step": "youtube_upload",
-                "youtube_url": result["youtube_url"]
-            })
+            try:
+                await manager.broadcast({
+                    "type": "youtube_upload_status",
+                    "status": "upload_complete",
+                    "message": f"UploaderAgent: {result['message']}",
+                    "step": "youtube_upload",
+                    "youtube_url": result["youtube_url"]
+                })
+            except Exception as e:
+                print(f"[WARNING] WebSocket 브로드캐스트 실패 (무시하고 계속): {str(e)}")
             return result["youtube_url"]
         else:
             raise Exception(result["message"])
         
     except Exception as e:
-        await manager.broadcast({
-            "type": "youtube_upload_status",
-            "status": "upload_failed",
-            "message": f"UploaderAgent: YouTube 업로드 실패: {str(e)}",
-            "step": "youtube_upload"
-        })
+        try:
+            await manager.broadcast({
+                "type": "youtube_upload_status",
+                "status": "upload_failed",
+                "message": f"UploaderAgent: YouTube 업로드 실패: {str(e)}",
+                "step": "youtube_upload"
+            })
+        except Exception as broadcast_error:
+            print(f"[WARNING] WebSocket 브로드캐스트 실패 (무시하고 계속): {str(broadcast_error)}")
         raise
 
 

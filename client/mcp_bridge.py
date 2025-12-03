@@ -28,7 +28,9 @@ def _call_a2a_server(endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     url = f"{A2A_SERVER_URL}{endpoint}"
     
     try:
-        response = requests.post(url, json=payload, timeout=300)
+        # YouTube 업로드 포함 시 더 긴 타임아웃 (최대 15분)
+        timeout = 900 if payload.get("upload_to_youtube", False) else 300
+        response = requests.post(url, json=payload, timeout=timeout)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.ConnectionError:
@@ -72,7 +74,7 @@ def create_healing_short(
     
     Args:
         topic: 비디오 주제 키워드 (예: "Rain", "Ocean Waves", "Forest")
-        video_duration: 비디오 길이 (초). YouTube Shorts는 15-60초 권장. 기본값: 30초
+        video_duration: 비디오 길이 (초). YouTube Shorts는 1초 이상 가능. 기본값: 30초
         upload_to_youtube: YouTube에 업로드할지 여부
         youtube_title: YouTube 비디오 제목 (선택사항)
         youtube_description: YouTube 비디오 설명 (선택사항)
@@ -81,11 +83,11 @@ def create_healing_short(
     Returns:
         워크플로우 실행 결과 및 에이전트 대화 로그
     """
-    # 비디오 길이 검증
-    if video_duration < 15 or video_duration > 60:
+    # 비디오 길이 최소값 검증 (1초 이상)
+    if video_duration < 1:
         return {
             "error": "비디오 길이 오류",
-            "message": "비디오 길이는 15초에서 60초 사이여야 합니다."
+            "message": "비디오 길이는 최소 1초 이상이어야 합니다."
         }
     
     # 태그 문자열을 리스트로 변환
@@ -103,7 +105,9 @@ def create_healing_short(
         "youtube_tags": tags_list
     }
     
-    result = _call_a2a_server("/v1/create_shorts", payload)
+    # YouTube 업로드가 요청된 경우 동기 엔드포인트 사용 (완료될 때까지 기다림)
+    endpoint = "/v1/create_shorts_sync" if upload_to_youtube else "/v1/create_shorts"
+    result = _call_a2a_server(endpoint, payload)
     
     # 에이전트 대화 로그 포맷팅
     if "conversation_log" in result:

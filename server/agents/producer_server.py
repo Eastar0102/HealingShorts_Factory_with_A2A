@@ -8,7 +8,7 @@ import os
 from typing import Dict, Any
 from ..a2a_server import A2AServerBase
 from ..models import AgentCard, AgentSkill, Task, TaskStatus, TaskState, TransportProtocol, AgentCapabilities
-from ..tools import generate_veo_video_for_duration, make_seamless_loop
+from ..tools import generate_veo_video_for_duration
 
 
 def handle_producer_task(task: Task) -> TaskStatus:
@@ -35,7 +35,7 @@ def handle_producer_task(task: Task) -> TaskStatus:
                 message="Task 입력에 'prompt' 필드가 필요합니다"
             )
         
-        # 1. Veo 비디오 생성 (8초 이하: 단일 클립, 8초 초과: 여러 클립 병합)
+        # Veo 비디오 생성 (8초 이하: 단일 클립, 8초 초과: 여러 클립 병합)
         print(f"[ProducerAgent] Veo 비디오 생성 시작...")
         veo_video_path = generate_veo_video_for_duration(
             prompt=prompt,
@@ -45,22 +45,17 @@ def handle_producer_task(task: Task) -> TaskStatus:
             resolution="1080p",  # YouTube Shorts 권장 해상도
         )
         
-        # 2. Seamless loop 생성
-        print(f"[ProducerAgent] Seamless loop 생성 시작...")
-        looped_video_path = make_seamless_loop(
-            veo_video_path,
-            target_duration=video_duration if video_duration else None,
-            target_resolution=(1080, 1920)  # YouTube Shorts 규격
-        )
+        # Seamless loop 제거 - 원본 비디오 그대로 사용
+        final_video_path = veo_video_path
         
         return TaskStatus(
             state=TaskState.COMPLETED,
             output={
-                "video_path": looped_video_path,
+                "video_path": final_video_path,
                 "original_video_path": veo_video_path,
                 "prompt": prompt
             },
-            message=f"비디오 생성 완료: {looped_video_path}"
+            message=f"비디오 생성 완료: {final_video_path}"
         )
         
     except Exception as e:
@@ -76,7 +71,7 @@ def create_producer_agent_card(base_url: str = "http://localhost:8003") -> Agent
     """ProducerAgent의 AgentCard 생성"""
     return AgentCard(
         name="ProducerAgent",
-        description="Veo API를 사용하여 비디오를 생성하고 seamless loop를 만드는 에이전트",
+        description="Veo API를 사용하여 비디오를 생성하는 에이전트",
         url=base_url,
         version="1.0.0",
         protocol_version="0.3.0",
@@ -84,12 +79,12 @@ def create_producer_agent_card(base_url: str = "http://localhost:8003") -> Agent
             AgentSkill(
                 id="produce",
                 name="Video Production",
-                description="Veo 프롬프트를 기반으로 비디오를 생성하고 seamless loop를 만듭니다.",
+                description="Veo 프롬프트를 기반으로 비디오를 생성합니다.",
                 examples=[
                     "Generate video from prompt",
-                    "Create seamless loop video"
+                    "Create video from Veo prompt"
                 ],
-                tags=["production", "video-generation", "veo", "seamless-loop"]
+                tags=["production", "video-generation", "veo"]
             )
         ],
         preferred_transport=TransportProtocol.HTTP_JSON,

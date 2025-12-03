@@ -180,6 +180,7 @@ CRITICAL: In the "OVERALL PROMPT FOR VEO" section, you MUST start with:
 
 This ensures Veo API understands the technical requirements clearly.
 
+
 Output your storyboard in the format specified above, then provide the final combined prompt for Veo."""
         
         # Gemini를 사용하여 프롬프트 생성
@@ -254,4 +255,3 @@ Tags should be relevant to: healing, ASMR, meditation, relaxation, nature, etc."
                 "description": f"Experience the calming atmosphere of {topic}. Perfect for meditation, relaxation, and ASMR. #healing #asmr #meditation #relaxation",
                 "tags": ["healing", "asmr", "meditation", "relaxation", topic.lower()]
             }
-

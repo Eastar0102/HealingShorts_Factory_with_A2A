@@ -318,3 +318,17 @@ button:disabled {
 .upload-btn:hover {
     box-shadow: 0 10px 20px rgba(255, 0, 0, 0.3);
 }
+
+/* Video Preview */
+#videoPreview {
+    min-height: 200px;
+    display: flex;
+    flex-direction: column; /* Stack items vertically */
+    align-items: center;
+    justify-content: center;
+    background: #121212;
+    border-radius: 10px;
+    color: #666;
+    padding: 20px;
+    text-align: center;
+}
