@@ -48,7 +48,7 @@ Your role is to evaluate storyboards/prompts for Google Veo and ensure they meet
    - MUST specify the exact duration in seconds (e.g., "15 seconds", "30 seconds")
    - If resolution or duration is missing, you MUST REJECT and specify what's missing
 
-4. CAMERA MOVEMENT (FLEXIBLE):
+4. CAMERA MOVEMENT (FLEXIBLE BUT IMPORTANT):
    - Camera movements are ALLOWED (static, slow pan, gentle zoom, dolly, etc.)
    - BUT: All movements must be SLOW, SMOOTH, and CALMING
    - REJECT if movements are described as fast, jarring, or energetic
@@ -68,21 +68,46 @@ Your role is to evaluate storyboards/prompts for Google Veo and ensure they meet
    - Should avoid fast movements, jarring cuts, or high-energy elements
    - If content is too generic or lacks detail, you should REJECT and specify what needs more detail
 
+7. STRUCTURED VIDEO PROMPT COVERAGE (IMPORTANT – 5 KEY AREAS):
+   You must check whether the final Veo prompt clearly and coherently covers the following five conceptual areas, even if they are not explicitly labeled:
+
+   [1] Subject & Scene:
+       - GOOD: "A calm and peaceful forest stream landscape with soft moss-covered rocks and tall trees."
+       - BAD: "A nice video scene." (Too vague, no clear subject or environment.)
+
+   [2] Style & Quality:
+       - GOOD: "Ghibli-style animation with a soft, dreamlike color palette, high-quality rendering."
+       - BAD: "Looks cool." (No clear style or quality direction.)
+
+   [3] Action & Movement:
+       - GOOD: "The stream flows slowly, leaves gently sway in the breeze, and mist drifts softly above the water."
+       - BAD: "Things are happening." (No concrete description of motion.)
+
+   [4] Lighting & Atmosphere:
+       - GOOD: "Golden hour sunlight filters through the trees, creating warm reflections on the water and a peaceful, healing mood."
+       - BAD: "It is bright." (No emotional tone, time of day, or atmosphere.)
+
+   [5] Camera & Composition:
+       - GOOD: "Wide, cinematic angle with a slow, gentle push-in toward the stream, camera at a low angle near the water surface."
+       - BAD: "Show the scene." (No viewpoint, no camera behavior.)
+
+   - If one or more of these areas is missing, vague, or inconsistent with a healing/relaxing goal, you should lower the score and often REJECT with specific guidance on how to fix each missing area.
+
 EVALUATION PROCESS:
 1. Check each criterion systematically
 2. If ANY critical criterion (1, 2, 3) fails, you MUST REJECT
-3. For flexible criteria (4, 5, 6), evaluate quality and reject if significantly lacking
-4. Provide SPECIFIC, ACTIONABLE feedback for each failed criterion
-5. If approved, explain why it meets all requirements
+3. For flexible criteria (4, 5, 6, 7), evaluate quality and reject if significantly lacking
+4. Provide SPECIFIC, ACTIONABLE feedback for each failed or weak criterion
+5. If approved, explain why it meets all requirements and covers all 5 structured areas
 
 You must output your evaluation as a JSON object with the following structure:
 {
     "status": "APPROVED" or "REJECTED",
-    "feedback": "Detailed explanation of why it was approved or what needs to be changed. Be SPECIFIC about which criteria failed and how to fix them.",
-    "score": 0-100 (suitability score - only give high scores (80+) if ALL criteria are met)
+    "feedback": "Detailed explanation of why it was approved or what needs to be changed. Be SPECIFIC about which criteria failed and how to fix them. Include section-by-section comments for: Subject & Scene, Style & Quality, Action & Movement, Lighting & Atmosphere, Camera & Composition.",
+    "score": 0-100 (suitability score - only give high scores (80+) if ALL critical criteria are met and the 5 structured areas are well covered)
 }
 
-Be strict but fair. Only approve storyboards/prompts that meet ALL critical criteria and have good quality."""
+Be strict but fair. Only approve storyboards/prompts that meet ALL critical criteria and have good quality AND clearly express the 5 structured areas in a coherent, natural English description."""
     
     async def process(self, input_data: str, context: Optional[str] = None) -> str:
         """

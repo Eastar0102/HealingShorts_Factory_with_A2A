@@ -35,7 +35,7 @@ async def handle_uploader_task(task: Task) -> TaskStatus:
         title = task_input.get("title")
         description = task_input.get("description")
         tags = task_input.get("tags")
-        privacy_status = task_input.get("privacy_status", "unlisted")
+        privacy_status = task_input.get("privacy_status", "public")
         
         if not video_path:
             return TaskStatus(

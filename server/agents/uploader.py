@@ -30,7 +30,7 @@ class UploaderAgent(BaseAgent):
         title: Optional[str] = None,
         description: Optional[str] = None,
         tags: Optional[list] = None,
-        privacy_status: str = "unlisted"
+        privacy_status: str = "public"
     ) -> Dict:
         """
         비디오 파일을 YouTube에 업로드합니다.

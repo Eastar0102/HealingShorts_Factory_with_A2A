@@ -149,7 +149,7 @@ def upload_video_to_youtube(
     title: str = None,
     description: str = None,
     tags: str = None,
-    privacy_status: str = "unlisted"
+    privacy_status: str = "public"
 ) -> Dict[str, Any]:
     """
     이미 생성된 비디오 파일을 YouTube에 업로드합니다.

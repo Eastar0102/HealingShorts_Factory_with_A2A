@@ -8,7 +8,7 @@ import os
 from typing import Dict, Any
 from ..a2a_server import A2AServerBase
 from ..models import AgentCard, AgentSkill, Task, TaskStatus, TaskState, TransportProtocol, AgentCapabilities
-from ..tools import generate_veo_clip, make_seamless_loop
+from ..tools import generate_veo_video_for_duration, make_seamless_loop
 
 
 def handle_producer_task(task: Task) -> TaskStatus:
@@ -35,14 +35,14 @@ def handle_producer_task(task: Task) -> TaskStatus:
                 message="Task 입력에 'prompt' 필드가 필요합니다"
             )
         
-        # 1. Veo 비디오 생성
+        # 1. Veo 비디오 생성 (8초 이하: 단일 클립, 8초 초과: 여러 클립 병합)
         print(f"[ProducerAgent] Veo 비디오 생성 시작...")
-        veo_video_path = generate_veo_clip(
+        veo_video_path = generate_veo_video_for_duration(
             prompt=prompt,
             output_dir=output_dir,
-            duration_seconds=int(video_duration) if video_duration else None,
+            total_duration_seconds=int(video_duration) if video_duration else None,
             aspect_ratio="9:16",  # YouTube Shorts 세로형
-            resolution="1080p"  # YouTube Shorts 권장 해상도
+            resolution="1080p",  # YouTube Shorts 권장 해상도
         )
         
         # 2. Seamless loop 생성

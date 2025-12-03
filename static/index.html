@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A2A Healing Shorts Factory</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>A2A Healing Shorts Factory</h1>
+            <p>AI Agent-to-Agent Workflow for Automated Video Generation</p>
+        </header>
+        
+        <div class="content">
+            <!-- Left Column: Controls -->
+            <div class="left-column">
+                <div class="input-section">
+                    <div class="section-title">
+                        <span>🎬</span> Create New Shorts
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="topic">Video Topic</label>
+                        <input type="text" id="topic" placeholder="e.g., Rain sounds, Ocean waves, Forest walk" autocomplete="off">
+                        <small>Enter a keyword or description for the healing video.</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="videoDuration">Duration (seconds)</label>
+                        <input type="number" id="videoDuration" value="30" min="15" max="300">
+                        <small>Recommended: 30-60 seconds for Shorts.</small>
+                    </div>
+                    
+                    <button id="createBtn">
+                        ✨ Start Generation
+                    </button>
+                </div>
+                
+                <div class="status-section" id="statusSection" style="margin-top: 30px;">
+                    <div class="status-card">
+                        <div class="status-header">
+                            <h3>🤖 Agent Workflow</h3>
+                            <span id="agentStatus" class="status-badge waiting">Waiting</span>
+                        </div>
+                        <div id="agentLog" class="log-container">
+                            <div class="log-entry">Waiting for request...</div>
+                        </div>
+                    </div>
+                    
+                    <div class="status-card">
+                        <div class="status-header">
+                            <h3>🎥 Video Processing</h3>
+                            <span id="videoStatus" class="status-badge waiting">Waiting</span>
+                        </div>
+                        <div id="videoLog" class="log-container" style="height: 150px;">
+                            <div class="log-entry">Waiting for prompt approval...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Column: Preview & Library -->
+            <div class="right-column">
+                <div class="status-card" style="margin-bottom: 30px;">
+                    <div class="section-title">
+                        <span>👁️</span> Preview
+                    </div>
+                    <div id="videoPreview" style="min-height: 200px; display: flex; align-items: center; justify-content: center; background: #121212; border-radius: 10px; color: #666;">
+                        Video preview will appear here
+                    </div>
+                </div>
+                
+                <!-- YouTube Upload Section (Hidden by default) -->
+                <div id="youtubeUploadSection" class="youtube-upload-section">
+                    <div class="section-title">
+                        <span>📺</span> Upload to YouTube
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="uploadTitle">Title</label>
+                        <input type="text" id="uploadTitle" placeholder="Video Title">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="uploadDescription">Description</label>
+                        <textarea id="uploadDescription" rows="4" placeholder="Video Description"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="uploadTags">Tags</label>
+                        <input type="text" id="uploadTags" placeholder="healing, asmr, nature (comma separated)">
+                    </div>
+                    
+                    <button id="uploadYoutubeBtn" class="upload-btn">
+                        📺 Upload to YouTube
+                    </button>
+                    <div id="youtubeUploadStatus" style="margin-top: 15px;"></div>
+                </div>
+                
+                <div class="status-card" style="margin-top: 30px;">
+                    <div class="status-header">
+                        <h3>📚 Video Library</h3>
+                        <button id="refreshVideoListBtn" style="width: auto; padding: 5px 15px; font-size: 0.8rem;">Refresh</button>
+                    </div>
+                    <div id="videoListContainer" style="max-height: 400px; overflow-y: auto;">
+                        <!-- Video list items will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/script.js"></script>
+</body>
+</html>

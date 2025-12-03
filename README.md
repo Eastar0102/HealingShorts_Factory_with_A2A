@@ -217,6 +217,49 @@ Healing Shorts를 생성합니다.
 └── venv/                            # (선택) 가상환경, gitignore 대상
 ```
 
+## Veo 3 Style Text-to-Video Prompt Structure
+
+This project uses a structured text-to-video prompt format for Google Veo-style models.  
+Planner and Reviewer agents are aligned on the following five conceptual areas:
+
+1. Subject & Scene
+   - Define the core subject(s), objects, and environment.
+   - Example: "A calm and peaceful forest stream landscape with moss-covered rocks and tall trees."
+
+2. Style & Quality
+   - Describe visual style, art direction, and technical quality.
+   - Example: "Ghibli-style animation with a soft, dreamlike color palette, high-quality rendering (4K)."
+
+3. Action & Movement (Key for Video)
+   - Describe what moves in the scene and how it moves over time.
+   - Example: "The stream flows slowly, leaves gently sway in the breeze, and mist drifts softly above the water."
+
+4. Lighting & Atmosphere
+   - Define lighting conditions, time of day, and emotional tone.
+   - Example: "Golden hour sunlight filters through the trees, creating warm reflections on the water and a peaceful, healing mood."
+
+5. Camera & Composition
+   - Describe viewpoint, framing, and camera behavior.
+   - Example: "Wide, cinematic angle with a slow, gentle push-in toward the stream, camera at a low angle near the water surface."
+
+### Example Prompts
+
+**Detailed Prompt Example**
+
+> A calm and peaceful forest stream landscape. Golden hour sunlight gently filters through the forest leaves, reflecting on the stream surface. The stream flows slowly, and surrounding grass blades sway subtly. The overall atmosphere is in a healing animation style, using a soft and dreamlike color palette reminiscent of Studio Ghibli films. Cinematic angle, warm tones.
+
+**Concise Prompt Example**
+
+> Forest stream landscape at golden hour. Ghibli-style animation, healing, peaceful, slowly flowing water.
+
+**Additional Options Example**
+
+- Aspect ratio: 9:16 (Shorts format)
+- Video length: 6 seconds
+- Style reference: Studio Ghibli or Makoto Shinkai
+
+PlannerAgent uses these guidelines to generate structured prompts and storyboards, and ReviewerAgent validates that all five areas are covered and suitable for Healing / ASMR / Nature / Relaxing content.
+
 ## 빠른 시작
 
 ### 1. 저장소 클론

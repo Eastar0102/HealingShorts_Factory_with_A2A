@@ -308,6 +308,122 @@ def generate_veo_clip(
         raise Exception(f"Veo 비디오 생성 실패: {error_str}")
 
 
+def generate_veo_video_for_duration(
+    prompt: str,
+    output_dir: str = "output",
+    total_duration_seconds: Optional[int] = None,
+    aspect_ratio: str = "9:16",
+    resolution: str = "1080p",
+) -> str:
+    """
+    전체 목표 길이를 기준으로 Veo 비디오를 생성합니다.
+    - 8초 이하: 단일 클립 생성
+    - 8초 초과: 최대 8초 단위로 여러 클립을 생성한 뒤 순차적으로 이어붙여 하나의 비디오로 반환
+
+    Args:
+        prompt: Veo 프롬프트
+        output_dir: 출력 디렉토리
+        total_duration_seconds: 최종 목표 비디오 길이 (초)
+        aspect_ratio: 비율 ("16:9" 또는 "9:16")
+        resolution: 해상도 ("720p" 또는 "1080p")
+
+    Returns:
+        최종 병합된 비디오 파일 경로
+    """
+    # total_duration_seconds가 없으면 기존 단일 호출과 동일하게 동작
+    if not total_duration_seconds:
+        return generate_veo_clip(
+            prompt=prompt,
+            output_dir=output_dir,
+            duration_seconds=None,
+            aspect_ratio=aspect_ratio,
+            resolution=resolution,
+        )
+
+    # 8초 이하이면 단일 클립만 생성
+    if total_duration_seconds <= 8:
+        return generate_veo_clip(
+            prompt=prompt,
+            output_dir=output_dir,
+            duration_seconds=int(total_duration_seconds),
+            aspect_ratio=aspect_ratio,
+            resolution=resolution,
+        )
+
+    # 8초 초과: [8,8,나머지] 형태로 분할
+    remaining = int(total_duration_seconds)
+    max_segment = 8
+    segments = []
+    while remaining > 0:
+        seg = min(max_segment, remaining)
+        segments.append(seg)
+        remaining -= seg
+
+    print(f"[Veo] 전체 길이 {total_duration_seconds}초 요청 → 세그먼트 분할: {segments}")
+
+    # 각 세그먼트 길이에 맞춰 개별 클립 생성
+    temp_paths = []
+    for idx, seg_duration in enumerate(segments):
+        print(f"[Veo] 세그먼트 {idx + 1}/{len(segments)} 생성 (길이: {seg_duration}초)")
+        clip_path = generate_veo_clip(
+            prompt=prompt,
+            output_dir=output_dir,
+            duration_seconds=seg_duration,
+            aspect_ratio=aspect_ratio,
+            resolution=resolution,
+        )
+        temp_paths.append(clip_path)
+
+    # 세그먼트가 1개면 그대로 반환 (이론상 8초 이하 케이스에서만 발생)
+    if len(temp_paths) == 1:
+        return temp_paths[0]
+
+    # 여러 클립을 순차적으로 이어붙이기
+    print(f"[Veo] {len(temp_paths)}개의 세그먼트를 하나의 비디오로 병합합니다...")
+    clips = []
+    try:
+        for path in temp_paths:
+            clip = VideoFileClip(path)
+            clips.append(clip)
+
+        final_clip = concatenate_videoclips(clips, method="compose")
+
+        # 최종 출력 경로
+        Path(output_dir).mkdir(exist_ok=True)
+        output_path = os.path.join(output_dir, f"veo_multi_{int(time.time())}.mp4")
+
+        final_clip.write_videofile(
+            output_path,
+            fps=30,
+            codec="libx264",
+            audio_codec="aac" if final_clip.audio is not None else None,
+            audio=True if final_clip.audio is not None else False,
+            logger=None,
+        )
+
+        # 최종 클립도 정리
+        final_clip.close()
+
+        print(f"[Veo] 다중 세그먼트 병합 완료: {output_path}")
+        return output_path
+    finally:
+        # 리소스 정리
+        for clip in clips:
+            try:
+                clip.close()
+            except Exception as e:
+                print(f"[Veo] 클립 리소스 정리 중 오류 (무시): {e}")
+        
+        # 임시 세그먼트 파일 삭제
+        for temp_path in temp_paths:
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                    print(f"[Veo] 임시 파일 삭제: {os.path.basename(temp_path)}")
+            except Exception as e:
+                print(f"[Veo] 임시 파일 삭제 실패 (무시): {os.path.basename(temp_path)}, {e}")
+
+
 def make_seamless_loop(
     input_path: str, 
     output_dir: str = "output",
@@ -366,11 +482,9 @@ def make_seamless_loop(
         
         # 목표 길이 설정
         if target_duration is not None:
-            # YouTube Shorts 길이 제한 확인 (15-60초)
-            if target_duration < 15:
-                print(f"[MoviePy] 경고: 목표 길이({target_duration}초)가 YouTube Shorts 최소 길이(15초)보다 짧습니다. 15초로 조정합니다.")
-                target_duration = 15
-            elif target_duration > 60:
+            # YouTube Shorts 최대 길이 제한 확인 (60초)
+            # 15초 미만도 허용 (일반 YouTube 비디오로 업로드 가능)
+            if target_duration > 60:
                 print(f"[MoviePy] 경고: 목표 길이({target_duration}초)가 YouTube Shorts 최대 길이(60초)보다 깁니다. 60초로 조정합니다.")
                 target_duration = 60
             
@@ -450,7 +564,7 @@ def upload_youtube_shorts(
     title: Optional[str] = None,
     description: Optional[str] = None,
     tags: Optional[list] = None,
-    privacy_status: str = "unlisted"
+    privacy_status: str = "public"
 ) -> str:
     """
     YouTube Shorts에 비디오를 업로드합니다.
