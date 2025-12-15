@@ -9,7 +9,8 @@ Google의 [a2a-samples](https://github.com/a2aproject/a2a-samples) 아키텍처 
 
 Planner와 Reviewer 에이전트가 Gemini LLM을 통해 피드백 루프로 협업하여 고품질 ASMR/Healing 비디오 프롬프트를 생성하고, Veo로 비디오를 제작한 후 YouTube Shorts에 업로드합니다.
 
-### 최신 업데이트 (2024)
+### 최신 업데이트
+
 
 - ✅ **비디오 길이 제한 제거**: 1초 이상의 모든 길이 지원 (YouTube Shorts 제한 없음)
 - ✅ **다양한 카메라 움직임 지원**: 정적 샷, 팬, 줌, 돌리 등 다양한 카메라 움직임 허용
