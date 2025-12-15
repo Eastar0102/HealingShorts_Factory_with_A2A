@@ -55,6 +55,37 @@ class BaseAgent(ABC):
         """
         pass
     
+    def _truncate_prompt(self, prompt: str, max_chars: int = 25000) -> str:
+        """
+        프롬프트 길이를 제한하여 Gemini API 503 오류를 방지합니다.
+        
+        Args:
+            prompt: 원본 프롬프트
+            max_chars: 최대 문자 수 (기본값: 25000자, 약 6000-7000 토큰)
+            
+        Returns:
+            잘린 프롬프트 (필요한 경우)
+        """
+        if len(prompt) <= max_chars:
+            return prompt
+        
+        # 프롬프트가 너무 길면 자르기
+        # 중요한 부분(시작 부분)은 유지하고, 중간/끝 부분을 자름
+        truncated = prompt[:max_chars]
+        
+        # 마지막 문장이 잘리지 않도록 마지막 줄바꿈이나 문장 끝을 찾아서 자름
+        last_newline = truncated.rfind('\n')
+        last_period = truncated.rfind('.')
+        last_cut = max(last_newline, last_period)
+        
+        if last_cut > max_chars * 0.9:  # 90% 이상이면 그 위치에서 자름
+            truncated = truncated[:last_cut + 1]
+        
+        # 잘렸다는 경고 메시지 추가
+        truncated += f"\n\n[Note: 프롬프트가 {len(prompt)}자에서 {len(truncated)}자로 제한되었습니다. 일부 내용이 생략되었을 수 있습니다.]"
+        
+        return truncated
+    
     async def _generate_content(self, prompt: str, response_mime_type: Optional[str] = None) -> str:
         """
         Gemini 모델을 사용하여 콘텐츠 생성 (async)
@@ -71,6 +102,9 @@ class BaseAgent(ABC):
         """
         import asyncio
         import concurrent.futures
+        
+        # 프롬프트 길이 제한 적용 (503 오류 방지)
+        prompt = self._truncate_prompt(prompt)
         
         # Config 준비
         config = None

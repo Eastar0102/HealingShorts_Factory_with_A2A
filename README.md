@@ -9,6 +9,14 @@ Google의 [a2a-samples](https://github.com/a2aproject/a2a-samples) 아키텍처 
 
 Planner와 Reviewer 에이전트가 Gemini LLM을 통해 피드백 루프로 협업하여 고품질 ASMR/Healing 비디오 프롬프트를 생성하고, Veo로 비디오를 제작한 후 YouTube Shorts에 업로드합니다.
 
+### 최신 업데이트 (2024)
+
+- ✅ **비디오 길이 제한 제거**: 1초 이상의 모든 길이 지원 (YouTube Shorts 제한 없음)
+- ✅ **다양한 카메라 움직임 지원**: 정적 샷, 팬, 줌, 돌리 등 다양한 카메라 움직임 허용
+- ✅ **Seamless Loop 제거**: 원본 비디오 그대로 사용하여 초반 페이드인 효과 제거
+- ✅ **동기/비동기 엔드포인트**: YouTube 업로드 시 완료까지 대기하는 동기 엔드포인트 제공
+- ✅ **WebSocket 안정성 개선**: 연결 끊김 시 자동 복구 및 에러 핸들링 강화
+
 ## 핵심 특징
 
 - **엄격한 A2A 통신**: `a2a-samples` 스타일의 Task / AgentCard / AgentMessage 기반 구조화된 에이전트 간 통신
@@ -17,6 +25,9 @@ Planner와 Reviewer 에이전트가 Gemini LLM을 통해 피드백 루프로 협
 - **비동기 처리**: FastAPI 비동기 엔드포인트 + 백그라운드 작업으로 비디오 처리 비블로킹
 - **MCP 통합**: FastMCP를 통한 Cursor IDE 통합 (`create_healing_short`, `upload_video_to_youtube`, `check_server_health` 툴 제공)
 - **MOCK / 실제 모드 자동 전환**: Veo 쿼터 초과 시 자동으로 MOCK 모드로 폴백
+- **유연한 비디오 길이**: 1초 이상의 모든 길이 지원 (YouTube Shorts 제한 없음)
+- **다양한 카메라 움직임**: 정적 샷, 팬, 줌, 돌리 등 다양한 카메라 움직임 지원
+- **WebSocket 실시간 업데이트**: 비디오 생성 및 업로드 진행 상황 실시간 모니터링
 
 ## A2A 아키텍처
 
@@ -139,8 +150,10 @@ python -m client.mcp_bridge
 
 Cursor IDE에서 `.cursor/mcp.json`에 이 브리지를 등록하면 다음 MCP 툴을 사용할 수 있습니다.
 
-- `create_healing_short(...)` → `POST /v1/create_shorts`
-- `upload_video_to_youtube(...)` → `POST /v1/upload_youtube`
+- `create_healing_short(topic, video_duration=30.0, upload_to_youtube=False, ...)` → `POST /v1/create_shorts` 또는 `/v1/create_shorts_sync`
+  - `upload_to_youtube=True`일 경우 동기 엔드포인트(`/v1/create_shorts_sync`) 사용하여 완료까지 대기
+  - `video_duration`은 1초 이상 가능 (기본값: 30초)
+- `upload_video_to_youtube(video_path, title=None, description=None, ...)` → `POST /v1/upload_youtube`
 - `check_server_health()` → `GET /health`
 
 ## API 사용
@@ -153,6 +166,7 @@ Healing Shorts를 생성합니다.
 ```json
 {
   "topic": "Rain",
+  "video_duration": 8.0,
   "upload_to_youtube": false,
   "youtube_title": "Healing Rain",
   "youtube_description": "Relaxing rain sounds",
@@ -160,24 +174,43 @@ Healing Shorts를 생성합니다.
 }
 ```
 
-**응답**:
+**파라미터 설명**:
+- `topic` (필수): 비디오 주제 키워드
+- `video_duration` (선택, 기본값: 30.0): 비디오 길이 (초). **1초 이상 가능** (YouTube Shorts 제한 없음)
+- `upload_to_youtube` (선택, 기본값: false): YouTube 자동 업로드 여부
+- `youtube_title` (선택): YouTube 비디오 제목
+- `youtube_description` (선택): YouTube 비디오 설명
+- `youtube_tags` (선택): YouTube 비디오 태그 (배열)
+
+**응답** (비동기):
 ```json
 {
   "status": "processing",
-  "approved_prompt": "Static camera, peaceful rain falling...",
+  "approved_prompt": "Peaceful rain falling on a quiet street...",
   "conversation_log": [...],
-  "message": "프롬프트 승인 완료..."
+  "message": "프롬프트 승인 완료. 비디오 생성 중..."
+}
+```
+
+**응답** (동기, `upload_to_youtube=true`일 경우):
+```json
+{
+  "status": "completed",
+  "approved_prompt": "Peaceful rain falling on a quiet street...",
+  "video_path": "output/veo_generated_1234567890.mp4",
+  "youtube_url": "https://www.youtube.com/watch?v=...",
+  "conversation_log": [...],
+  "message": "비디오 생성 및 YouTube 업로드 완료"
 }
 ```
 
 ## 워크플로우
 
-1. **Planner**: 사용자 키워드를 Veo 프롬프트로 변환
-2. **Reviewer**: 프롬프트를 LLM으로 평가 (Static Camera, Theme, Quality)
+1. **Planner**: 사용자 키워드를 Veo 프롬프트로 변환 (다양한 카메라 움직임 지원)
+2. **Reviewer**: 프롬프트를 LLM으로 평가 (Camera Movement, Theme, Quality)
 3. **피드백 루프**: 거부 시 Planner가 피드백을 반영하여 재생성 (최대 5회)
 4. **Producer**: 승인된 프롬프트로 Veo 비디오 생성
-5. **Loop**: MoviePy로 seamless loop 생성
-6. **Uploader**: YouTube Shorts에 업로드 (선택사항)
+5. **Uploader**: YouTube Shorts에 업로드 (선택사항)
 
 ## 디렉토리 구조
 
@@ -240,6 +273,8 @@ Planner and Reviewer agents are aligned on the following five conceptual areas:
 
 5. Camera & Composition
    - Describe viewpoint, framing, and camera behavior.
+   - Supports various camera movements: static shots, slow pans, gentle zooms, dolly movements, camera tilts
+   - All movements must be slow, smooth, and calming
    - Example: "Wide, cinematic angle with a slow, gentle push-in toward the stream, camera at a low angle near the water surface."
 
 ### Example Prompts
@@ -311,8 +346,25 @@ python -m server.main
 ```bash
 curl -X POST "http://localhost:8000/v1/create_shorts" \
   -H "Content-Type: application/json" \
-  -d '{"topic": "Rain", "upload_to_youtube": false}'
+  -d '{"topic": "Rain", "video_duration": 8.0, "upload_to_youtube": false}'
 ```
+
+### 7. MCP 브리지 설정 (Cursor IDE)
+
+`.cursor/mcp.json` 파일에 다음 설정을 추가하세요:
+
+```json
+{
+  "mcpServers": {
+    "shorts-factory": {
+      "command": "python",
+      "args": ["-m", "client.mcp_bridge"]
+    }
+  }
+}
+```
+
+Cursor IDE를 재시작하면 MCP 툴을 사용할 수 있습니다.
 
 ## 문제 해결
 
